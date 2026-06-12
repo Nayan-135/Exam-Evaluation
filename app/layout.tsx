@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,8 +14,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI-Powered LMS Platform",
-  description: "A classroom management and AI-based exam evaluation platform.",
+  title: {
+    default: "AI LMS",
+    template: "%s | AI LMS",
+  },
+
+  description:
+    "AI-Powered Learning Management and Assessment Platform",
+
+  keywords: [
+    "LMS",
+    "AI Evaluation",
+    "Education",
+    "Classroom",
+    "Exams",
+    "Assignments",
+    "Students",
+    "Teachers",
+  ],
+
+  authors: [
+    {
+      name: "Nayan Ghate",
+    },
+  ],
 };
 
 export default function RootLayout({
@@ -25,9 +48,23 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`
+        ${geistSans.variable}
+        ${geistMono.variable}
+        h-full
+      `}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body
+        className="
+          min-h-screen
+          bg-background
+          text-foreground
+          font-sans
+          antialiased
+          overflow-hidden
+        "
+      >
         {children}
       </body>
     </html>
