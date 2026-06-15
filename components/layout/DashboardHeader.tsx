@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import { Bell, LogOut, ChevronDown } from "lucide-react";
 import NotificationDropdown from "./NotificationDropdown";
@@ -79,25 +80,23 @@ export default function DashboardHeader({ name, role }: Props) {
             onClick={() => setShowNotifications(!showNotifications)}
             className="relative h-9 w-9 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-secondary transition-colors"
             disabled={isLoggingOut}
+            aria-label="Toggle notifications menu"
           >
             <Bell size={18} />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary"></span>
+            {/* Notification alert dot badge */}
+            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
           </button>
+          
+          {/* Aligned Dropdown - Now matching its strict Props interface */}
           {showNotifications && (
-            <NotificationDropdown
-              notifications={[
-                { id: "1", title: "New Exam Published", message: "DBMS Mid Term is now available." },
-                { id: "2", title: "Result Released", message: "AI Assignment 1 marks are out." },
-              ]}
-              onClose={() => setShowNotifications(false)}
-            />
+            <NotificationDropdown onClose={() => setShowNotifications(false)} />
           )}
         </div>
 
         {/* Divider */}
         <div className="h-6 w-px bg-border mx-1" />
 
-        {/* User info */}
+        {/* User Profile Summary */}
         <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-secondary transition-colors cursor-pointer">
           <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
             {initials}
@@ -109,7 +108,7 @@ export default function DashboardHeader({ name, role }: Props) {
           <ChevronDown size={14} className="text-muted hidden sm:block" />
         </div>
 
-        {/* Logout Button */}
+        {/* Action Logout Control */}
         <button
           onClick={handleLogout}
           disabled={isLoggingOut}

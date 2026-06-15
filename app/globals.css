@@ -97,3 +97,16 @@ body {
     page-break-after: auto;
   }
 }
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  * {
+    box-shadow: none !important;
+  }
+}
