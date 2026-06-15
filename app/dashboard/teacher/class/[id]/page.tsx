@@ -3,7 +3,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Exam } from "@/types";
-import { Calendar, Layers, ShieldCheck, ArrowLeft, FilePlus, Users as UsersIcon, Mail } from "lucide-react";
+import Link from "next/link"; // Ensure Link is imported for layout routing
+import { Calendar, Layers, ShieldCheck, ArrowLeft, FilePlus, Mail, Users as UsersIcon } from "lucide-react";
 
 export default function TeacherClassDetails() {
   const { id } = useParams();
@@ -18,23 +19,13 @@ export default function TeacherClassDetails() {
     async function getRoomData() {
       if (!id) return;
       
-      // Fetch class metadata
       const { data: info } = await supabase.from("classes").select("*").eq("id", id).maybeSingle();
-      
-      // Fetch exam list[cite: 1]
       const { data: testList } = await supabase.from("exams").select("*").eq("class_id", id).order("created_at", { ascending: false });
-      
-      // Fetch joined students by joining class_members with the users table[cite: 1]
       const { data: memberList } = await supabase
         .from("class_members")
         .select(`
           joined_at,
-          users:student_id (
-            first_name,
-            last_name,
-            email,
-            avatar_url
-          )
+          users:student_id (first_name, last_name, email, avatar_url)
         `)
         .eq("class_id", id);
       
@@ -51,43 +42,44 @@ export default function TeacherClassDetails() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8 animate-slide-up">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border/60 pb-6">
+      {/* Header and Sub-navigation Actions */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/60 pb-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push("/dashboard/teacher")} className="p-2 border border-border bg-card hover:bg-secondary rounded-xl text-muted hover:text-foreground transition-all">
+          <button 
+            onClick={() => router.push("/dashboard/teacher")} 
+            className="p-2 border border-border bg-card hover:bg-secondary rounded-xl text-muted hover:text-foreground transition-all"
+          >
             <ArrowLeft size={16} />
           </button>
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Classroom Ecosystem[cite: 1]</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Classroom Ecosystem</span>
             <h1 className="text-2xl font-extrabold text-foreground tracking-tight">{classDetails.class_name}</h1>
           </div>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex bg-secondary/50 p-1 rounded-xl border border-border">
-          <button 
-            onClick={() => setActiveTab("exams")}
-            className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === "exams" ? "bg-card text-primary shadow-sm" : "text-muted hover:text-foreground"}`}
-          >
+        {/* Modular View Segment Switcher */}
+        <div className="flex bg-secondary/50 p-1 rounded-xl border border-border shrink-0">
+          <button onClick={() => setActiveTab("exams")} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === "exams" ? "bg-card text-primary shadow-sm" : "text-muted hover:text-foreground"}`}>
             Exams
           </button>
-          <button 
-            onClick={() => setActiveTab("students")}
-            className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === "students" ? "bg-card text-primary shadow-sm" : "text-muted hover:text-foreground"}`}
-          >
+          <button onClick={() => setActiveTab("students")} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === "students" ? "bg-card text-primary shadow-sm" : "text-muted hover:text-foreground"}`}>
             Students ({students.length})
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* Left Side Dynamic Main Block */}
         <div className="lg:col-span-2 space-y-5">
           
           {activeTab === "exams" ? (
             <>
               <div className="flex justify-between items-center">
-                <h3 className="font-bold text-md text-foreground">Configured Assessments[cite: 1, 11]</h3>
-                <button className="flex items-center gap-1.5 text-xs font-bold bg-primary text-white px-3.5 py-2 rounded-xl hover:bg-blue-600 transition-all shadow-xs">
+                <h3 className="font-bold text-md text-foreground">Configured Assessments</h3>
+                <button 
+                  onClick={() => router.push(`/dashboard/teacher/class/${id}/create-exam`)}
+                  className="flex items-center gap-1.5 text-xs font-bold bg-primary text-white px-3.5 py-2 rounded-xl hover:bg-blue-600 transition-all shadow-xs active:scale-95"
+                >
                   <FilePlus size={14} /> New Exam
                 </button>
               </div>
@@ -99,7 +91,12 @@ export default function TeacherClassDetails() {
               ) : (
                 <div className="space-y-3">
                   {exams.map((ex) => (
-                    <div key={ex.id} className="p-4 bg-card border border-border rounded-xl flex justify-between items-center hover:border-primary/20 transition-all shadow-2xs group">
+                    // UPDATED: Wrapped the card layout inside a dynamic Link route endpoint anchor
+                    <Link 
+                      key={ex.id} 
+                      href={`/dashboard/teacher/class/${id}/exam/${ex.id}`}
+                      className="p-4 bg-card border border-border rounded-xl flex justify-between items-center hover:border-primary/40 hover:bg-secondary/20 transition-all shadow-2xs group cursor-pointer block"
+                    >
                       <div>
                         <h4 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{ex.title}</h4>
                         <div className="flex items-center gap-3 text-[11px] text-muted mt-1 font-medium">
@@ -107,20 +104,25 @@ export default function TeacherClassDetails() {
                           {ex.due_date && <span className="flex items-center gap-1"><Calendar size={12}/> Due: {new Date(ex.due_date).toLocaleDateString()}</span>}
                         </div>
                       </div>
-                      <span className={`text-[10px] px-2.5 py-0.5 border rounded-md font-bold ${ex.is_published ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-amber-500/10 text-amber-600 border-amber-500/20"}`}>
+                      <span className={`text-[10px] px-2.5 py-0.5 border rounded-md font-bold ${
+                        ex.is_published 
+                          ? "bg-green-500/10 text-green-600 border-green-500/20" 
+                          : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                      }`}>
                         {ex.is_published ? "Active" : "Draft"}
                       </span>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}
             </>
           ) : (
+            // Students tab container rendering path code trace
             <>
-              <h3 className="font-bold text-md text-foreground">Enrolled Students[cite: 1]</h3>
+              <h3 className="font-bold text-md text-foreground">Enrolled Students</h3>
               {students.length === 0 ? (
                 <div className="text-center py-12 bg-card border-2 border-dashed border-border/60 rounded-2xl text-xs text-muted">
-                  No students have joined this classroom node yet[cite: 1].
+                  No students have used your join code to enter this classroom node yet.
                 </div>
               ) : (
                 <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-2xs">
@@ -157,7 +159,7 @@ export default function TeacherClassDetails() {
           )}
         </div>
 
-        {/* Diagnostics Panel */}
+        {/* Right Side Diagnostics Panel */}
         <div className="p-5 bg-card border border-border rounded-2xl space-y-4 shadow-2xs">
           <div>
             <h4 className="text-xs font-bold uppercase text-muted tracking-widest">Workspace Diagnostics</h4>
@@ -171,8 +173,8 @@ export default function TeacherClassDetails() {
               </span>
             </div>
             <div className="flex justify-between items-center border-b border-border/40 pb-2.5">
-              <span className="text-muted font-medium">Total Students</span> 
-              <span className="text-foreground font-bold">{students.length}</span>
+              <span className="text-muted font-medium">Total Registered</span> 
+              <span className="text-foreground font-bold flex items-center gap-1"><UsersIcon size={13}/> {students.length} Enrolled</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-muted font-medium">Status</span> 
