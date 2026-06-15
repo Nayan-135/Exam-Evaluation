@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { ClassItem } from "@/types";
+import { Users, FileText, ArrowRight } from "lucide-react";
 
 interface ClassCardProps {
   item: ClassItem;
@@ -11,35 +12,40 @@ export function ClassCard({ item, role }: ClassCardProps) {
   const href = `/dashboard/${role.toLowerCase()}/class/${item.id}`;
 
   return (
-    <Link href={href} className="group relative block rounded-2xl border border-border bg-card p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-md">
-      <div className="absolute top-0 left-0 h-1.5 w-0 bg-primary transition-all duration-300 group-hover:w-full rounded-t-2xl" />
+    <Link href={href} className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg dark:hover:shadow-primary/5">
+      {/* Decorative top illumination track */}
+      <div className="absolute top-0 left-0 h-[3px] w-0 bg-primary transition-all duration-300 group-hover:w-full" />
       
-      <div className="flex flex-col h-full justify-between">
-        <div>
-          <div className="flex items-start justify-between gap-4">
-            <h3 className="font-bold text-lg text-foreground tracking-tight group-hover:text-primary transition-colors line-clamp-1">
-              {item.name}
-            </h3>
-            <span className="inline-flex items-center rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground font-mono">
-              {item.join_code}
-            </span>
-          </div>
-          
-          <p className="mt-2 text-sm text-muted line-clamp-2 min-h-[40px]">
-            {item.description || "No description provided for this classroom."}
-          </p>
+      <div>
+        <div className="flex items-start justify-between gap-4">
+          <h3 className="text-lg font-bold text-foreground tracking-tight group-hover:text-primary transition-colors line-clamp-1">
+            {item.class_name}
+          </h3>
+          <span className="inline-flex items-center rounded-lg bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground font-mono uppercase tracking-wider">
+            {item.join_code}
+          </span>
         </div>
+        
+        <p className="mt-2.5 text-sm text-muted line-clamp-2 min-h-[40px] leading-relaxed">
+          {item.description || "No description provided for this classroom network node."}
+        </p>
+      </div>
 
-        <div className="mt-6 flex items-center justify-between border-t border-border/60 pt-4 text-xs text-muted">
-          {role === "TEACHER" ? (
-            <>
-              <span className="flex items-center gap-1">👥 <b>{item._count?.class_members || 0}</b> Students</span>
-              <span className="flex items-center gap-1">📝 <b>{item._count?.exams || 0}</b> Exams</span>
-            </>
-          ) : (
-            <span className="flex items-center gap-1">👨‍🏫 Instructor: {item.teacher_name || "Assigned Teacher"}</span>
-          )}
+      <div className="mt-6 flex items-center justify-between border-t border-border/50 pt-4 text-xs text-muted">
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1.5 font-medium">
+            <Users size={14} className="text-muted/70" />
+            <span>{item.member_count ?? 0} Students</span>
+          </span>
+          <span className="flex items-center gap-1.5 font-medium">
+            <FileText size={14} className="text-muted/70" />
+            <span>{item.exam_count ?? 0} Exams</span>
+          </span>
         </div>
+        
+        <span className="text-primary opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300 flex items-center gap-1 font-semibold">
+          Enter <ArrowRight size={14} />
+        </span>
       </div>
     </Link>
   );
