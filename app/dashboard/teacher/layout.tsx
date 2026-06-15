@@ -14,6 +14,9 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Unified global state to track and control the sliding effect on the teacher side
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   const fetchSyncData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -41,12 +44,33 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   return (
     <TeacherContext.Provider value={{ syncUI: fetchSyncData }}>
       <div className="flex flex-col h-screen overflow-hidden bg-background">
-        <DashboardHeader name={profile.name} role={profile.role} />
-        <div className="flex flex-1 overflow-hidden">
-          <TeacherSidebar classes={sidebarClasses} onCreateClass={() => setIsModalOpen(true)} />
-          <main className="flex-1 overflow-y-auto bg-background/40">{children}</main>
+        
+        {/* Linked with state hooks to inject the sliding menu action button */}
+        <DashboardHeader 
+          name={profile.name} 
+          role={profile.role} 
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        />
+        
+        <div className="flex flex-1 overflow-hidden h-[calc(100vh-64px)] w-full">
+          {/* Linked with layout visibility variables to execute hardware shifts */}
+          <TeacherSidebar 
+            classes={sidebarClasses} 
+            onCreateClass={() => setIsModalOpen(true)} 
+            isCollapsed={isSidebarCollapsed}
+          />
+          
+          <main className="flex-1 overflow-y-auto bg-background/40">
+            {children}
+          </main>
         </div>
-        <CreateClassModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={fetchSyncData} />
+
+        <CreateClassModal 
+          isOpen={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          onSuccess={fetchSyncData} 
+        />
       </div>
     </TeacherContext.Provider>
   );

@@ -17,6 +17,9 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   const [joinedClasses, setJoinedClasses] = useState<any[]>([]);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // State to manage the sliding effect sync between header toggle button and sidebar framework
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const fetchSidebarData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -36,7 +39,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
       });
     }
 
-    // Fetch Enrolled Classes [cite: 21]
+    // Fetch Enrolled Classes
     const { data: enrollmentData } = await supabase
       .from("class_members")
       .select(`classes(id, name)`)
@@ -67,17 +70,21 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   return (
     <StudentDashboardContext.Provider value={{ refreshSidebar: fetchSidebarData }}>
       <div className="flex flex-col h-screen overflow-hidden bg-background">
-        {/* Unified Top Navigation */}
+        
+        {/* Unified Top Navigation with Collapse Interactivity hooks */}
         <DashboardHeader 
           name={userProfile?.name || "Student Core"} 
           role={userProfile?.role || "STUDENT"} 
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
 
         {/* Workspace Splitting Layout */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden h-[calc(100vh-64px)] w-full">
           <StudentSidebar 
             classes={joinedClasses} 
             onJoinClass={() => setIsJoinModalOpen(true)} 
+            isCollapsed={isSidebarCollapsed}
           />
           
           <main className="flex-1 overflow-y-auto bg-background/50">

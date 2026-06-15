@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Bell, LogOut, ChevronDown } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, LogOut, ChevronDown, Menu } from "lucide-react";
 import NotificationDropdown from "./NotificationDropdown";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -9,38 +9,66 @@ import { useRouter } from "next/navigation";
 interface Props {
   name: string;
   role: string;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-export default function DashboardHeader({ name, role }: Props) {
+export default function DashboardHeader({ 
+  name, 
+  role, 
+  isSidebarCollapsed = false, 
+  onToggleSidebar 
+}: Props) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const router = useRouter();
+
+  // Fetch notifications at header level to control the bell state accurately
+  const loadNotifications = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (data) setNotifications(data);
+    } catch (error) {
+      console.error("Error fetching header notices:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  // Check if there is at least one unread notification to show the indicator dot
+  const hasUnread = notifications.some((n) => !n.is_read);
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
 
     try {
-      // 1. Explicitly invoke global sign-out to revoke tokens on Supabase auth nodes
       const { error } = await supabase.auth.signOut({ scope: "global" });
       if (error) {
         console.error("Supabase session revocation error:", error.message);
       }
 
-      // 2. Clear local storage explicitly to remove cached auth tokens
       if (typeof window !== "undefined") {
         window.localStorage.removeItem("supabase.auth.token");
         window.localStorage.clear();
       }
 
-      // 3. Clear Next.js server component router caches 
       router.refresh();
-
-      // 4. Force a clean client redirect directly to the login panel
       router.push("/auth/sign_in");
     } catch (err) {
       console.error("An unexpected error occurred during session destruction:", err);
-      // Fallback hard refresh to home page if client router encounters blocking conditions
       if (typeof window !== "undefined") {
         window.location.href = "/auth/sign_in";
       }
@@ -61,35 +89,64 @@ export default function DashboardHeader({ name, role }: Props) {
 
   return (
     <header className="h-16 shrink-0 border-b border-border bg-card flex items-center justify-between px-6 z-40">
-      {/* Logo */}
-      <div className="flex items-center gap-2.5">
-        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 13L8 3L13 13" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M5 9.5H11" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
+      
+      {/* Left Action and Branding Section */}
+      <div className="flex items-center gap-4">
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            aria-label={isSidebarCollapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"}
+            className="h-9 w-9 rounded-xl flex items-center justify-center text-muted hover:text-foreground hover:bg-secondary border border-transparent hover:border-border transition-all active:scale-95"
+          >
+            <Menu 
+              size={19} 
+              className={`transition-transform duration-300 ease-out ${
+                isSidebarCollapsed ? "" : "rotate-90 text-primary"
+              }`} 
+            />
+          </button>
+        )}
+
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 13L8 3L13 13" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M5 9.5H11" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </div>
+          <span className="font-bold text-lg tracking-tight text-foreground">AI-LMS</span>
         </div>
-        <span className="font-bold text-lg tracking-tight text-foreground">AI-LMS</span>
       </div>
 
-      {/* Right actions */}
+      {/* Right User Actions Section */}
       <div className="flex items-center gap-2">
         {/* Notification Bell */}
         <div className="relative">
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className="relative h-9 w-9 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-secondary transition-colors"
+            className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-colors ${
+              showNotifications 
+                ? "text-primary bg-primary/10" 
+                : "text-muted hover:text-foreground hover:bg-secondary"
+            }`}
             disabled={isLoggingOut}
             aria-label="Toggle notifications menu"
           >
-            <Bell size={18} />
-            {/* Notification alert dot badge */}
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
+            <Bell size={18} className={hasUnread ? "animate-wiggle" : ""} />
+            
+            {/* Condition 1 Met: Dot visible strictly if unread notifications exist */}
+            {hasUnread && (
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
+            )}
           </button>
           
-          {/* Aligned Dropdown - Now matching its strict Props interface */}
+          {/* Render dropdown with pre-fetched items and update triggers */}
           {showNotifications && (
-            <NotificationDropdown onClose={() => setShowNotifications(false)} />
+            <NotificationDropdown 
+              initialNotifications={notifications}
+              onMutate={loadNotifications}
+              onClose={() => setShowNotifications(false)} 
+            />
           )}
         </div>
 
