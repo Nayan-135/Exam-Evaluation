@@ -1,94 +1,86 @@
 "use client";
-
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { generateJoinCode } from "@/lib/generateJoinCode";
 
-interface Props {
-  teacherId: string;
+interface CreateClassModalProps {
+  isOpen: boolean;
   onClose: () => void;
+  onSuccess: () => void;
 }
 
-export default function CreateClassModal({
-  teacherId,
-  onClose,
-}: Props) {
-  const [className, setClassName] =
-    useState("");
+export function CreateClassModal({ isOpen, onClose, onSuccess }: CreateClassModalProps) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const [description, setDescription] =
-    useState("");
+  if (!isOpen) return null;
 
-  const handleCreate = async () => {
-    const joinCode =
-      generateJoinCode();
+  const generateJoinCode = () => {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  };
 
-    const { error } =
-      await supabase
-        .from("classes")
-        .insert({
-          class_name: className,
-          description: description,
-          join_code: joinCode,
-          teacher_id: teacherId,
-        });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
 
-    if (error) {
-      alert(error.message);
-      return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Authentication state error.");
+
+      const joinCode = generateJoinCode();
+
+      const { error: insertError } = await supabase.from("classes").insert({
+        name,
+        description,
+        join_code: joinCode,
+        teacher_id: user.id
+      });
+
+      if (insertError) throw insertError;
+
+      setName("");
+      setDescription("");
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred.");
+    } finally {
+      setLoading(false);
     }
-
-    alert(
-      `Class Created\nJoin Code: ${joinCode}`
-    );
-
-    onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex justify-center items-center">
-      <div className="bg-white rounded-xl p-6 w-[500px]">
-        <h2 className="text-xl font-bold mb-4">
-          Create Classroom
-        </h2>
-
-        <input
-          placeholder="Class Name"
-          value={className}
-          onChange={(e) =>
-            setClassName(
-              e.target.value
-            )
-          }
-          className="w-full border p-2 rounded mb-3"
-        />
-
-        <textarea
-          placeholder="Description"
-          value={description}
-          onChange={(e) =>
-            setDescription(
-              e.target.value
-            )
-          }
-          className="w-full border p-2 rounded mb-4"
-        />
-
-        <div className="flex gap-2">
-          <button
-            onClick={handleCreate}
-            className="bg-blue-600 text-white px-4 py-2 rounded"
-          >
-            Create
-          </button>
-
-          <button
-            onClick={onClose}
-            className="border px-4 py-2 rounded"
-          >
-            Cancel
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-background/80 backdrop-blur-xs transition-opacity" onClick={onClose} />
+      
+      <div className="relative w-full max-w-md transform overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-xl transition-all animate-slide-up">
+        <div className="flex items-center justify-between pb-4 border-b border-border">
+          <h3 className="text-lg font-bold text-foreground">Create New Class</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-secondary hover:text-foreground">✕</button>
         </div>
+
+        {error && <div className="mt-4 p-3 text-xs bg-red-50 text-red-600 rounded-lg border border-red-100">{error}</div>}
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-foreground">Class Name *</label>
+            <input type="text" required placeholder="e.g., Advanced Machine Learning" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-border p-2.5 bg-background text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-foreground">Description</label>
+            <textarea placeholder="Optional details or section schedules..." rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full rounded-lg border border-border p-2.5 bg-background text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary resize-none" />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-xs font-semibold rounded-lg border border-border text-foreground hover:bg-secondary">Cancel</button>
+            <button type="submit" disabled={loading} className="px-4 py-2 text-xs font-semibold text-white bg-primary rounded-lg hover:bg-blue-600 disabled:opacity-50">
+              {loading ? "Creating..." : "Create Class"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

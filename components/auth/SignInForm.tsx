@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -7,140 +6,41 @@ import { supabase } from "@/lib/supabase";
 
 export function SignInForm() {
   const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (
-    e: React.FormEvent
-  ) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     setLoading(true);
+    setError("");
 
-    try {
-      const { error } =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    if (authError) { setError(authError.message); setLoading(false); return; }
 
-      if (error) {
-        alert(error.message);
-        setLoading(false);
-        return;
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        alert("User not found");
-        setLoading(false);
-        return;
-      }
-
-      const {
-        data: profile,
-        error: profileError,
-      } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        alert(profileError.message);
-        setLoading(false);
-        return;
-      }
-
-      if (!profile) {
-        alert(
-          "Profile not found. Please create account again."
-        );
-        setLoading(false);
-        return;
-      }
-
-      if (profile.role === "TEACHER") {
-        router.push("/dashboard/teacher");
-      } else {
-        router.push("/dashboard/student");
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Something went wrong");
-    }
-
-    setLoading(false);
+    const { data: profile } = await supabase.from("users").select("role").eq("id", data.user.id).single();
+    router.push(profile?.role === "TEACHER" ? "/dashboard/teacher" : "/dashboard/student");
   };
 
   return (
-    <div className="flex w-full flex-col gap-6">
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold">
-          Welcome Back
-        </h1>
-
-        <p className="text-sm text-zinc-500 mt-2">
-          Login to your account
-        </p>
+    <div className="flex w-full flex-col gap-7">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+        <p className="text-sm text-muted mt-1">Sign in to your AI-LMS account.</p>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col gap-4"
-      >
-        <div>
-          <label>Email</label>
+      {error && <div className="p-3 text-xs bg-red-50 text-red-600 rounded-lg border border-red-100">{error}</div>}
 
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) =>
-              setEmail(e.target.value)
-            }
-            className="w-full border rounded-md p-2"
-          />
-        </div>
-
-        <div>
-          <label>Password</label>
-
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) =>
-              setPassword(e.target.value)
-            }
-            className="w-full border rounded-md p-2"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-black text-white p-2 rounded-md"
-        >
-          {loading
-            ? "Signing In..."
-            : "Sign In"}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <input type="email" placeholder="Email address" required className="w-full rounded-lg border border-border p-2.5 bg-card" onChange={(e) => setEmail(e.target.value)} />
+        <input type="password" placeholder="Password" required className="w-full rounded-lg border border-border p-2.5 bg-card" onChange={(e) => setPassword(e.target.value)} />
+        <button type="submit" disabled={loading} className="w-full rounded-lg py-2.5 font-semibold text-white bg-primary disabled:opacity-50">
+          {loading ? "Signing in..." : "Sign In"}
         </button>
       </form>
-
-      <p className="text-center">
-        Don't have an account?
-        <Link
-          href="/auth/sign_up"
-          className="underline ml-2"
-        >
-          Sign Up
-        </Link>
+      <p className="text-center text-sm text-muted">
+        Don't have an account? <Link href="/auth/sign_up" className="font-semibold text-primary">Create one</Link>
       </p>
     </div>
   );
