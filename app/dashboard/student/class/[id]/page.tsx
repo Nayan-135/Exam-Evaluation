@@ -2,8 +2,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Exam } from "@/types";
-import { Calendar, Layers, ArrowLeft, Clock, Award, Sparkles, ChevronRight } from "lucide-react";
+import { Calendar, Layers, ArrowLeft, Clock, Award, ChevronRight, Lock } from "lucide-react";
 
 export default function StudentClassDetails() {
   const { id: classId } = useParams();
@@ -42,12 +41,14 @@ export default function StudentClassDetails() {
 
       // 3. Fetch current student's submissions for these exams
       const { data: { user } } = await supabase.auth.getUser();
-      if (user && totalExams) {
+      if (user && totalExams && totalExams.length > 0) {
+        const examIds = totalExams.map(e => e.id);
+        
         const { data: userSubmissions } = await supabase
           .from("submissions")
           .select("*")
           .eq("student_id", user.id)
-          .eq("exam_id", totalExams.map(e => e.id));
+          .in("exam_id", examIds);
 
         // Create a lookup map for faster access speeds
         const subMap = new Map(userSubmissions?.map(s => [s.exam_id, s]));
@@ -59,6 +60,7 @@ export default function StudentClassDetails() {
           const matchingSub = subMap.get(ex.id);
           const examWithSubContext = { ...ex, submission: matchingSub || null };
 
+          // Strictly push to completed if a final submission record exists
           if (matchingSub && matchingSub.status === "SUBMITTED") {
             completed.push(examWithSubContext);
           } else {
@@ -68,6 +70,9 @@ export default function StudentClassDetails() {
 
         setActiveExams(available);
         setCompletedExams(completed);
+      } else {
+        setActiveExams([]);
+        setCompletedExams([]);
       }
       setLoading(false);
     }
@@ -182,7 +187,7 @@ export default function StudentClassDetails() {
                 return (
                   <div 
                     key={ex.id} 
-                    className="p-5 bg-card border border-border rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-border"
+                    className="p-5 bg-card border border-border rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-primary/20"
                   >
                     <div className="space-y-1">
                       <h4 className="text-sm font-bold text-foreground">{ex.title}</h4>
@@ -198,7 +203,7 @@ export default function StudentClassDetails() {
                           {isReleased ? (
                             <span className="text-primary">{ex.submission.total_marks} / {ex.total_marks}m</span>
                           ) : (
-                            <span className="text-muted/80 text-xs italic font-medium">Awaiting Faculty Release</span>
+                            <span className="text-amber-500 text-xs font-medium bg-amber-500/5 px-2.5 py-1 border border-amber-500/10 rounded-md">Pending Faculty Release</span>
                           )}
                         </span>
                       </div>
@@ -207,7 +212,7 @@ export default function StudentClassDetails() {
                         onClick={() => router.push(`/dashboard/student/class/${classId}/exam/${ex.id}`)}
                         className="px-4 py-2 text-xs font-bold bg-secondary text-foreground hover:bg-secondary/80 border border-border rounded-xl transition-all"
                       >
-                        Review Submission
+                        Review Performance
                       </button>
                     </div>
                   </div>

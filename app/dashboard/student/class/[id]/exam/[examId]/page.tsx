@@ -2,7 +2,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Save, ShieldCheck, Sparkles, AlertCircle, HelpCircle, FileText, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Sparkles, AlertCircle, Lock } from "lucide-react";
 
 export default function StudentExamWorkspace() {
   const { id: classId, examId } = useParams();
@@ -20,6 +20,7 @@ export default function StudentExamWorkspace() {
 
   useEffect(() => {
     async function initWorkspace() {
+      if (!examId) return;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -38,7 +39,6 @@ export default function StudentExamWorkspace() {
       if (subData) {
         setSubmission(subData);
         
-        // Populate typed answers from submission history metadata matrix
         if (subData.student_answers) {
           const mappedAnswers: { [key: string]: string } = {};
           subData.student_answers.forEach((ans: any) => {
@@ -47,7 +47,6 @@ export default function StudentExamWorkspace() {
           setAnswers(mappedAnswers);
         }
 
-        // If the teacher has released the results, fetch detailed itemized marks and feedback
         if (subData.is_released_by_teacher) {
           const { data: gradesData } = await supabase
             .from("answers")
@@ -62,14 +61,14 @@ export default function StudentExamWorkspace() {
   }, [examId]);
 
   const handleTextChange = (qId: string, txt: string) => {
-    if (submission && submission.status === "SUBMITTED") return; // Read-only if locked
+    if (submission && submission.status === "SUBMITTED") return; 
     setAnswers({ ...answers, [qId]: txt });
   };
 
-  // Safe and defensive AI Evaluation connection routine targeting Gemini Pro 1.5 API models
+  // Fixed AI Evaluation Connection compatible with the free tier routing requirements
   const runAIEvaluationPipeline = async (questionText: string, sampleAnswer: string, studentAnswer: string, maxMarks: number) => {
     const key = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!key) throw new Error("Gemini API access key configuration token is missing in .env environment caches.");
+    if (!key) throw new Error("Gemini API access key configuration token is missing in environment variables.");
 
     const prompt = `
       You are an expert academic evaluator tool grading an LMS exam response. 
@@ -82,33 +81,48 @@ export default function StudentExamWorkspace() {
 
       Perform a rigorous comparison. Award marks proportionately based on how well the student's answer captures the core concepts, correctness, and keywords compared to the baseline answer. Provide a constructive, professional critique.
       
-      Return EXACTLY a clean JSON format block with no markdown wrappers:
+      CRITICAL: You must return your response EXACTLY as a single stringified JSON object. Do not include markdown code block backticks like \`\`\`json. 
+      The JSON structure must match this scheme exactly:
       {
         "awarded_marks": number,
-        "feedback": "string critique text"
+        "feedback": "string text evaluation here"
       }
     `;
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+    // FIXED: Updated endpoint to v1beta and set the exact model version keyword to 'gemini-1.5-flash-latest' to support Free Tier Keys
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      body: JSON.stringify({ 
+        contents: [{ parts: [{ text: prompt }] }]
+      })
     });
 
     const outputJson = await res.json();
+    
+    if (!res.ok || outputJson.error) {
+      console.error("Gemini Raw Diagnostic Trace Object:", outputJson);
+      const errMessage = outputJson?.error?.message || JSON.stringify(outputJson);
+      throw new Error(`AI Backend Exception: ${errMessage}`);
+    }
 
-    // FIXED: Bulletproof optional chaining and node check conditions guarding against API schema structure variance crashes
     const textSegmentResult = outputJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+    
     if (!textSegmentResult) {
-      console.error("Gemini API error trace response envelope:", outputJson);
+      console.error("Malformed payload schema caught:", outputJson);
       throw new Error("Invalid or empty response payload returned from the AI evaluation engine.");
     }
 
-    const cleanJsonString = textSegmentResult.replace(/```json/g, "").replace(/```/g, "").trim();
+    const cleanJsonString = textSegmentResult
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
     return JSON.parse(cleanJsonString);
   };
 
   const executeSubmissionPipeline = async (isFinalCommit: boolean) => {
+    if (submission?.status === "SUBMITTED") return; 
     setEvaluating(true);
     setError("");
     try {
@@ -123,7 +137,6 @@ export default function StudentExamWorkspace() {
       let cumulativeScore = 0;
       let evaluatedAnswersList: any[] = [];
 
-      // Run AI pipeline evaluations synchronously only if explicitly finalizing submission
       if (isFinalCommit) {
         for (const q of questions) {
           const studentTxt = answers[q.id] || "";
@@ -136,14 +149,9 @@ export default function StudentExamWorkspace() {
               awarded_marks: Number(aiGradingResult.awarded_marks || 0),
               feedback: aiGradingResult.feedback || "Automated review completed."
             });
-          } catch (e) {
-            console.error("AI automated pipeline calculation fault line:", e);
-            evaluatedAnswersList.push({ 
-              question_id: q.id, 
-              answer_text: studentTxt, 
-              awarded_marks: 0, 
-              feedback: "Automated analysis pipeline encountered a timeout error profile." 
-            });
+          } catch (e: any) {
+            console.error("Pipeline failure logged:", e);
+            throw new Error(`Failed during Evaluation on Question #${q.question_number || '?'}: ${e.message || e}`);
           }
         }
       }
@@ -168,7 +176,6 @@ export default function StudentExamWorkspace() {
 
       if (saveResult.error) throw saveResult.error;
       
-      // Batch write items inside public.answers table relational schema maps
       if (isFinalCommit && saveResult.data) {
         const answersPayload = evaluatedAnswersList.map(item => ({
           submission_id: saveResult.data.id,
@@ -201,7 +208,6 @@ export default function StudentExamWorkspace() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-8 animate-slide-up">
-      
       {/* Header View Mapping */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/60 pb-5">
         <div className="flex items-center gap-3">
@@ -217,7 +223,7 @@ export default function StudentExamWorkspace() {
         {isLocked && (
           <div className="flex flex-wrap gap-2 shrink-0">
             <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 border border-green-500/20 text-green-500 text-xs font-bold rounded-xl">
-              <ShieldCheck size={13}/> Handed In
+              <ShieldCheck size={13}/> Submission Finalized
             </span>
             {resultsPublished && (
               <span className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 border border-primary/20 text-primary text-xs font-black rounded-xl font-mono">
@@ -234,7 +240,7 @@ export default function StudentExamWorkspace() {
         </div>
       )}
 
-      {/* Main Questions Array Mapping Layout */}
+      {/* Questions Loop */}
       <div className="space-y-6">
         {questions.map((q, idx) => {
           const matchingGrade = gradeLookup.get(q.id);
@@ -260,12 +266,11 @@ export default function StudentExamWorkspace() {
                 disabled={isLocked || evaluating}
                 value={answers[q.id] || ""}
                 onChange={(e) => handleTextChange(q.id, e.target.value)}
-                placeholder="Type your structured exam answer response here..."
+                placeholder={isLocked ? "No submission context entered." : "Type your structured exam answer response here..."}
                 rows={5}
-                className="w-full p-3 bg-background border border-border text-sm text-foreground rounded-xl focus:border-primary resize-none disabled:opacity-70 transition-all leading-relaxed placeholder:text-muted/50"
+                className="w-full p-3 bg-background border border-border text-sm text-foreground rounded-xl focus:border-primary resize-none disabled:opacity-60 transition-all leading-relaxed placeholder:text-muted/50"
               />
 
-              {/* Review AI Insights and Comments if published by the teacher */}
               {resultsPublished && matchingGrade?.feedback && (
                 <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl text-xs text-muted leading-relaxed animate-slide-up">
                   <span className="font-bold text-foreground block mb-1 flex items-center gap-1.5">
@@ -279,8 +284,13 @@ export default function StudentExamWorkspace() {
         })}
       </div>
 
-      {/* Interactive Bottom Control Action Row */}
-      {!isLocked && (
+      {/* Actions Tray */}
+      {isLocked ? (
+        <div className="p-4 bg-secondary/20 border border-border rounded-2xl flex items-center gap-3 text-xs text-muted font-medium">
+          <Lock size={14} className="text-muted" />
+          This examination node is securely locked. Answers have been successfully stored and evaluated.
+        </div>
+      ) : (
         <div className="p-4 bg-card border border-border rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4 shadow-2xs">
           <p className="text-[11px] text-muted font-medium">
             * Finalizing will run the answers through the semantic similarity grading pipelines.
